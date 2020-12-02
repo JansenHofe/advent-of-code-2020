@@ -61,6 +61,7 @@ int main(int argc, char *argv[]) {
     int result = executeOnEachLine(argv[1], INPUT_LINE_BUFFER_SIZE, checkValidPasswords);
     if(result != 0) {
         perror("Error processing file: ");
+        return -1;
     }
 
     printf("Puzzle 1 answer: %i\n", validPasswordsOldPolicy);
