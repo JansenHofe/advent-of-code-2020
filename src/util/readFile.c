@@ -47,6 +47,23 @@ int readFile(char* path, int bufferLength, AocFile* fileOut) {
     return 0;
 }
 
+int executeOnEachLine(char* path, int bufferLength, readLineCallback onReadLine) {
+    FILE* filePointer;
+    char buffer[bufferLength]; 
+    filePointer = fopen(path, "r");
+
+    if(filePointer == NULL) {
+        return -1;
+    }
+
+    while(fgets(buffer, bufferLength, filePointer)) {
+        onReadLine(buffer);
+    }
+
+    fclose(filePointer);
+    return 0;
+}
+
 void closeFile(AocFile* file) {
     for(int i = 0; i < file->lineCount; i++) {
         free(file->lines[i]);

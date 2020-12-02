@@ -6,7 +6,10 @@ typedef struct {
     int lineCount;
 } AocFile;
 
+typedef void (*readLineCallback)(char* currentLine);
+
 int readFile(char* path, int bufferLength, AocFile* fileOut);
+int executeOnEachLine(char* path, int bufferLength, readLineCallback onReadLine);
 void closeFile(AocFile* file);
 
 #endif
