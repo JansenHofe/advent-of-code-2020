@@ -10,9 +10,11 @@
 
 void putKeyValueIntoPassport(char** passport, char* keyValue) {
 
-    // split key-value pair by delimiter
-    char* key = strtok(keyValue, KEY_VALUE_DELIMITER);
-    char* value = strtok(NULL, KEY_VALUE_DELIMITER);
+    // split key-value pair by delimiter by replacing it with null terminator
+    char* delimiterChar = strchr(keyValue, KEY_VALUE_DELIMITER);
+    delimiterChar[0] = '\0';
+    char* key = keyValue;
+    char* value = delimiterChar + 1;
 
     //put values into passport in correct order 
     for(int i = 0; i < NUM_PASSPORT_FIELDS; i++) {
@@ -121,7 +123,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    char* currentPassport[8];
+    char* currentPassport[NUM_PASSPORT_FIELDS];
     int filledPassportCounter = 0;
     int validPassportCounter = 0;
 
@@ -141,13 +143,12 @@ int main(int argc, char *argv[]) {
         }
 
         // split each line into key-value pairs
-        char* keyValueSavePointer;
-        char* keyValue = strtok_r(line, KEY_VALUE_PAIR_DELIMITERS, &keyValueSavePointer);
+        char* keyValue = strtok(line, KEY_VALUE_PAIR_DELIMITERS);
         while (keyValue != NULL)
         {
             // parse each key-value pair and sort it into current passport
             putKeyValueIntoPassport(currentPassport, keyValue);
-            keyValue = strtok_r(NULL, KEY_VALUE_PAIR_DELIMITERS, &keyValueSavePointer);
+            keyValue = strtok(NULL, KEY_VALUE_PAIR_DELIMITERS);
         }
     }
     // check for last passport not separated by empty line
