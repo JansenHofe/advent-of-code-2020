@@ -62,18 +62,6 @@ void parseBagRule(char *inputLine, ParentBag* bag) {
         }
 }
 
-void clearBagList(ParentBag *bags, int bagCount) {
-     for(int i = 0; i < bagCount; i++) {
-        ChildBagListItem *curr = bags[i].childListHead;
-        while (curr != NULL) {
-            ChildBagListItem *toFree = curr;
-            curr = curr->next;
-            free(toFree);
-        }
-    }
-    free(bags);
-}
-
 int checkBagsContaining(ParentBag *bag, ParentBag* allBags, int allBagsCount, char* searchedBag) {
     
     ChildBagListItem *currChild = bag->childListHead;
@@ -131,7 +119,7 @@ int main(int argc, char *argv[]) {
     }
 
     // for better performance, the parent-child relation of the bags should be implemented as a map/dict for faster lookup
-    ParentBag *parentBags = malloc(sizeof(ParentBag) * file.lineCount);
+    ParentBag parentBags[file.lineCount];
 
     for(int i = 0; i < file.lineCount; i++) {
         parseBagRule(file.lines[i], &parentBags[i]);
@@ -156,6 +144,5 @@ int main(int argc, char *argv[]) {
     printf("Puzzle 1 Answer: %i\n", bagsWithShinyGoldSubBag);
     printf("Puzzle 2 Answer: %i\n", subBagsOfShinyGold);
 
-    clearBagList(parentBags, file.lineCount);
     closeFile(&file);
 }
