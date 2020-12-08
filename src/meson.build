@@ -1,3 +1,6 @@
+valgrind = find_program('valgrind', required: false)
+valgrind_args = ['--tool=memcheck', '--leak-check=full', '--error-exitcode=1']
+
 subdir('util')
 subdir('day1')
 subdir('day2')

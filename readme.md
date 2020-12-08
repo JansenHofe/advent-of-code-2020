@@ -66,4 +66,4 @@ Example: In order to execute the puzzles of day 2, run:
 ./build/src/day2/puzzle ./build/src/day2/input.txt
 ```
 
-You could also run all executables at once by running `meson test` from within the `build` dir which will generate a test log in `build/meson-logs/testlog.txt`.
+You could also run all executables at once by running `meson test` from within the `build` dir which will generate a test log in `build/meson-logs/testlog.txt`. This will also include Valgrind memcheck for finding possible memory leaks (only if valgrind is installed). If you want to omit these tests, run `meson test --suite basic`

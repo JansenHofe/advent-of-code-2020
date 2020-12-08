@@ -1,5 +1,5 @@
 
-configure_file(input: 'input.txt', output: 'input.txt', copy: true)
+day6_input = configure_file(input: 'input.txt', output: 'input.txt', copy: true)
 
 day6_exe = executable(
     'puzzle',
@@ -7,4 +7,8 @@ day6_exe = executable(
     dependencies: util_dep
 )
 
-test('Day 6', day6_exe, args: meson.current_build_dir() + '/input.txt')
+test('Day 6 executes successfully', day6_exe, args: day6_input, suite: 'basic')
+
+if valgrind.found()
+    test('Day 6 memory leak check', valgrind, args: [ valgrind_args, day6_exe, day6_input], suite: 'memcheck')
+endif
