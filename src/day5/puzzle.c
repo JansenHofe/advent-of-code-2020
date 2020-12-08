@@ -23,8 +23,8 @@ int seatStringToNumber(char* seatString, char toZeroChar) {
 }
 
 int calculateSeatId(char* input) {
-    char rowString[ROW_STRING_LENGTH + 1];
-    char colString[COL_STRING_LENGTH + 1];
+    char rowString[ROW_STRING_LENGTH + 1] = "";
+    char colString[COL_STRING_LENGTH + 1] = "";
 
     // split whole seat number string into row and column parts
     strncpy(rowString, input, ROW_STRING_LENGTH);
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     // look for step of two between each subsequent seat IDs, this 'missing' ID is mine
     int mySeatId = -1;
-    for(int i = 0; i < file.lineCount; i++) {
+    for(int i = 1; i < file.lineCount; i++) {
         if(seatIds[i] - seatIds[i -1] == 2) {
             mySeatId = seatIds[i] - 1;
             break;
@@ -82,4 +82,6 @@ int main(int argc, char *argv[]) {
 
     printf("Puzzle 1 Answer: %i\n", maxSeatId);
     printf("Puzzle 2 Answer: %i\n", mySeatId);
+
+    closeFile(&file);
 }

@@ -47,7 +47,7 @@ int checkHeightValid(char* inputString) {
     strcpy(unit, (inputString + (strlen(inputString) - HEIGHT_UNIT_STRING_LENGHT)));
     
     // check height value based on unit string
-    char value[HEIGHT_VALUE_BUFFER];
+    char value[HEIGHT_VALUE_BUFFER] = "";
     if(strcmp(unit, HEIGHT_UNIT_CM) == 0) {
         strncpy(value, inputString, strlen(inputString) - HEIGHT_UNIT_STRING_LENGHT);
         return (atoi(value) >= HEIGHT_CM_MIN && atoi(value) <= HEIGHT_CM_MAX ? 1 : 0);
@@ -124,6 +124,9 @@ int main(int argc, char *argv[]) {
     }
 
     char* currentPassport[NUM_PASSPORT_FIELDS];
+    for(int i = 0; i < NUM_PASSPORT_FIELDS; i++) {
+        currentPassport[i] = "";
+    }
     int filledPassportCounter = 0;
     int validPassportCounter = 0;
 

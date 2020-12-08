@@ -31,6 +31,7 @@ int main(int argc, char *argv[]) {
                 printf("Puzzle 1 answer: %i\n", (expenses[i] * expenses[j]));
                 firstAnswerFound = 1;
                 if(secondAnswerFound) {
+                    closeFile(&file);
                     return 0;
                 }
             }
@@ -41,11 +42,10 @@ int main(int argc, char *argv[]) {
                 }
                 secondAnswerFound = 1;
                 if(firstAnswerFound) {
+                    closeFile(&file);
                     return 0;
                 }
             }
         }
     }
-
-    closeFile(&file);
 }
