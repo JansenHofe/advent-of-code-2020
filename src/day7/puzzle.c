@@ -19,78 +19,111 @@ typedef struct ChildBagListItem {
 typedef struct ParentBag {
     char* name;
     ChildBagListItem *childListHead;
+    struct ParentBag* next;
 
 } ParentBag;
 
-void parseBagRule(char *inputLine, ParentBag* bag) {
+// hash algorith "djb2" (modified), see http://www.cse.yorku.ca/~oz/hash.html
+unsigned long hash(char *str, int size)
+{
+    unsigned long hash = 5381;
+    int c;
 
-        // terminate parent bag name
-        char* parentBagEnd = strstr(inputLine, PARENT_BAG_STRING_DELIMITER);
-        *parentBagEnd = '\0';
-        bag->name = inputLine;
-        bag->childListHead = NULL;
+    while ((c = *str++) != 0)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
 
-        // start point of children string
-        char* childrenLine = parentBagEnd + PARENT_BAG_STRING_DELIMITER_SIZE;
-
-        // return if no child bags are allowed
-        if(strstr(childrenLine, "no other bags") != NULL) {
-            return;
-        }
-        // iterate each child bag token
-        char* childToken = strtok(childrenLine, CHILD_DELIMITER);
-        while(childToken != NULL) {
-
-            ChildBagListItem* currentItem = malloc(sizeof(ChildBagListItem));
-            // parse count
-            char* childNameToken;
-            currentItem->count = strtol(childToken, &childNameToken, 10);
-            
-            //skip single whitespace
-            childNameToken++;
-
-            // terminate child name
-            char* childNameEnd = strstr(childNameToken, CHILD_BAG_DELIMITER);
-            *childNameEnd = '\0';
-
-            //add child to list
-            currentItem->name = childNameToken;
-            currentItem->next = bag->childListHead;
-            bag->childListHead = currentItem;
-
-            childToken = strtok(NULL, CHILD_DELIMITER);
-        }
+    return (hash % size);
 }
 
-void clearBagList(ParentBag *bags, int bagCount) {
-     for(int i = 0; i < bagCount; i++) {
-        ChildBagListItem *curr = bags[i].childListHead;
+
+void addToHashTable(ParentBag** table, int hashSize, ParentBag* bagToAdd) {
+    int index = hash(bagToAdd->name, hashSize);
+    ParentBag* curr = table[index];
+    bagToAdd->next = curr;
+    table[index] = bagToAdd;
+}
+
+ParentBag* findInHashTable(ParentBag** table, int hashSize, char* name) {
+    int index = hash(name, hashSize);
+    ParentBag* curr = table[index];
+    while(curr != NULL) {
+        if(strcmp(name, curr->name) == 0) {
+            return curr;
+        }
+        curr = curr->next;
+    }
+    return NULL;
+}
+
+ParentBag* parseBagRule(char *inputLine) {
+
+    ParentBag* bag = malloc(sizeof(ParentBag));
+    // terminate parent bag name
+    char* parentBagEnd = strstr(inputLine, PARENT_BAG_STRING_DELIMITER);
+    *parentBagEnd = '\0';
+    bag->name = inputLine;
+    bag->childListHead = NULL;
+
+    // start point of children string
+    char* childrenLine = parentBagEnd + PARENT_BAG_STRING_DELIMITER_SIZE;
+
+    // return if no child bags are allowed
+    if(strstr(childrenLine, "no other bags") != NULL) {
+        return bag;
+    }
+    // iterate each child bag token
+    char* childToken = strtok(childrenLine, CHILD_DELIMITER);
+    while(childToken != NULL) {
+
+        ChildBagListItem* currentItem = malloc(sizeof(ChildBagListItem));
+        // parse count
+        char* childNameToken;
+        currentItem->count = strtol(childToken, &childNameToken, 10);
+        
+        //skip single whitespace
+        childNameToken++;
+
+        // terminate child name
+        char* childNameEnd = strstr(childNameToken, CHILD_BAG_DELIMITER);
+        *childNameEnd = '\0';
+
+        //add child to list
+        currentItem->name = childNameToken;
+        currentItem->next = bag->childListHead;
+        bag->childListHead = currentItem;
+
+        childToken = strtok(NULL, CHILD_DELIMITER);
+    }
+    return bag;
+}
+
+void clearBagList(ParentBag** bags, int bagCount) {
+    for(int i = 0; i < bagCount; i++) {
+        ChildBagListItem *curr = bags[i]->childListHead;
         while (curr != NULL) {
             ChildBagListItem *toFree = curr;
             curr = curr->next;
             free(toFree);
         }
+        free(bags[i]);
     }
 }
 
-int checkBagsContaining(ParentBag *bag, ParentBag* allBags, int allBagsCount, char* searchedBag) {
+int checkBagsContaining(ParentBag* bag, ParentBag** bagHashTable, int hashSize, char* searchedBagName) {
     
     ChildBagListItem *currChild = bag->childListHead;
 
     while(currChild != NULL) {
 
         // if the one child is the searched child return true
-        if(strcmp(currChild->name, searchedBag) == 0) {
+        if(strcmp(currChild->name, searchedBagName) == 0) {
             return 1;
         }
-        for(int i = 0; i < allBagsCount; i++) {
-            // search current child in parent list and check recurively for that one
-            if(strcmp(currChild->name, allBags[i].name) == 0) {
-                if(checkBagsContaining(&allBags[i], allBags, allBagsCount, searchedBag)) {
-                    return 1;
-                }
-                break;
-            }
+        ParentBag* searchedBag = findInHashTable(bagHashTable, hashSize, currChild->name);
+
+        // search each bag recursively
+        if(checkBagsContaining(searchedBag, bagHashTable, hashSize, searchedBagName)) {
+            return 1;
         }
         currChild = currChild->next;
     }
@@ -99,18 +132,14 @@ int checkBagsContaining(ParentBag *bag, ParentBag* allBags, int allBagsCount, ch
 }
 
 
-int countTotalBags(ParentBag *bag, ParentBag* allBags, int allBagsCount) {
+int countTotalBags(ParentBag *bag, ParentBag** bagHashTable, int hashSize) {
     ChildBagListItem *currChild = bag->childListHead;
     int bagCounter = 1;
+
+    // count in each sub bag recursively
     while(currChild != NULL) {
-        for(int i = 0; i < allBagsCount; i++) {
-            // search current child in parent list and check recurively for that one
-            if(strcmp(currChild->name, allBags[i].name) == 0) {
-                // multiply count of bags in each child with the count of children of this kind
-                bagCounter += (currChild->count * countTotalBags(&allBags[i], allBags, allBagsCount));
-                break;
-            }
-        }
+        ParentBag* searchedBag = findInHashTable(bagHashTable, hashSize, currChild->name);
+        bagCounter +=  (currChild->count * countTotalBags(searchedBag, bagHashTable, hashSize));
         currChild = currChild->next;
     }
     return bagCounter;
@@ -129,28 +158,31 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    // for better performance, the parent-child relation of the bags should be implemented as a map/dict for faster lookup
-    ParentBag parentBags[file.lineCount];
+    // create empty hashTable (here the table size equals the line count)
+    int hashSize = file.lineCount;
+    ParentBag* parentBagsTable[hashSize];
+    for(int i = 0; i < hashSize; i++) {
+        parentBagsTable[i] = NULL;
+    }
 
+    // add each parsed rule into the hashTable AND into a plain array (for better iteration)
+    ParentBag* parentBags[file.lineCount];
     for(int i = 0; i < file.lineCount; i++) {
-        parseBagRule(file.lines[i], &parentBags[i]);
+        ParentBag* current = parseBagRule(file.lines[i]);
+        addToHashTable(parentBagsTable, hashSize, current);
+        parentBags[i] = current;
     }
 
     int bagsWithShinyGoldSubBag = 0;
-    ParentBag *myBag;
 
     for(int i = 0; i < file.lineCount; i++) {
-
         // count bags recursively containing "shiny gold" bag
-        bagsWithShinyGoldSubBag += checkBagsContaining(&parentBags[i], parentBags, file.lineCount, "shiny gold");
-
-        // remember the "shiny gold" bag for puzzle 2
-        if(strcmp(parentBags[i].name, "shiny gold") == 0) {
-            myBag = &parentBags[i];
-        }
+        bagsWithShinyGoldSubBag += checkBagsContaining(parentBags[i], parentBagsTable, hashSize, "shiny gold");
     }
+    
     // count total bags of bag "shiny gold" and substact 1, as the question does not ask for the "root" bag itself
-    int subBagsOfShinyGold = (countTotalBags(myBag, parentBags, file.lineCount) - 1);
+    ParentBag* shinyGoldBag = findInHashTable(parentBagsTable, hashSize, "shiny gold");
+    int subBagsOfShinyGold = (countTotalBags(shinyGoldBag, parentBagsTable, hashSize) - 1);
 
     printf("Puzzle 1 Answer: %i\n", bagsWithShinyGoldSubBag);
     printf("Puzzle 2 Answer: %i\n", subBagsOfShinyGold);
