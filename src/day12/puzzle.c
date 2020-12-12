@@ -11,6 +11,7 @@ typedef struct {
     int y;
 } Position, Direction;
 
+//                                                     east          south         north          west
 Direction compassDirections[NUM_COMPASS_DIRECTIONS] = {{.x=1, .y=0}, {.x=0, .y=1}, {.x=-1, .y=0}, {.x=0, .y=-1}}; 
 
 // modulo function working with negative numbers, so -1 mod 4 = 3
@@ -38,7 +39,7 @@ int getDistanceFollowingDirectInstructions(AocFile* instructions, Position start
     return (abs(startPos.x) + abs(startPos.y));
 }
 
-int getDistanceFollowingWaypointInstructions(AocFile* instructions, Position startPos, int startDir, Position waypointStartPos) {
+int getDistanceFollowingWaypointInstructions(AocFile* instructions, Position startPos, Position waypointStartPos) {
     for(int i = 0; i < instructions->lineCount; i++) {
         int value = atoi((instructions->lines[i] + 1));
 
@@ -84,7 +85,7 @@ int main(int argc, char *argv[]) {
     Position wayPointStartPos = {.x=10, .y=-1};
 
     int distanceDirectInstructions = getDistanceFollowingDirectInstructions(&file, startPos, startDirectionIdx);
-    int distanceWaypointInstructions = getDistanceFollowingWaypointInstructions(&file, startPos, startDirectionIdx, wayPointStartPos);
+    int distanceWaypointInstructions = getDistanceFollowingWaypointInstructions(&file, startPos, wayPointStartPos);
     printf("Puzzle 1 Answer: %i\n", distanceDirectInstructions);
     printf("Puzzle 2 Answer: %i\n", distanceWaypointInstructions);
 
