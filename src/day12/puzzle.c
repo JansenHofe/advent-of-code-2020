@@ -47,15 +47,10 @@ int getDistanceFollowingWaypointInstructions(AocFile* instructions, Position sta
         case 'E': waypointStartPos.x += value; break;
         case 'S': waypointStartPos.y += value; break;
         case 'W': waypointStartPos.x -= value; break;
-        case 'L': 
-            for(int i = 0; i < (value / 90); i++) {
-                int temp = waypointStartPos.x;
-                waypointStartPos.x = waypointStartPos.y;
-                waypointStartPos.y = (temp * -1);
-            }
-            break;
-        
+        case 'L': value *= 3; 
+            // intentionally no break
         case 'R': 
+            // rotate waypoint
             for(int i = 0; i < (value / 90); i++) {
                 int temp = waypointStartPos.y;
                 waypointStartPos.y = waypointStartPos.x;
