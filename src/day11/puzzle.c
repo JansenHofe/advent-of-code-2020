@@ -81,7 +81,7 @@ int applyRules(char** seatLayout, int width, int height, getOccupiedSeatsFunctio
         }
     }
     // return the number of changed positions in layout
-    return layoutChanges++;
+    return layoutChanges;
 }
 
 int getOccupiedSeatsOnStableLayout(AocFile *file, getOccupiedSeatsFunction getOccSeatsFn, int occSeatTolerance) {
