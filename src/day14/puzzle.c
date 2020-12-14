@@ -5,6 +5,8 @@
 #include <math.h>
 
 #define INPUT_LINE_BUFFER_SIZE 50
+#define HASH_SIZE 1000
+#define MASK_SIZE 36
 
 typedef struct {
     long prepareMask;
@@ -79,9 +81,10 @@ void clearHashTable(MemListItem** table, int hashSize) {
 
 BitMasks parseBitmasks(char* input) {
     char* maskStart = (input + 7);
-    char prepareMaskString[37];
-    char overwriteMaskString[37];
-    for(int i = 0; i < 36; i++) {
+    char prepareMaskString[MASK_SIZE + 1];
+    char overwriteMaskString[MASK_SIZE + 1];
+
+    for(int i = 0; i < MASK_SIZE; i++) {
         if(maskStart[i] == 'X') {
             prepareMaskString[i] = '1';
             overwriteMaskString[i] = '0';
@@ -90,8 +93,8 @@ BitMasks parseBitmasks(char* input) {
             overwriteMaskString[i] = maskStart[i];
         }
     }
-    prepareMaskString[36] = '\0';
-    overwriteMaskString[36] = '\0';
+    prepareMaskString[MASK_SIZE] = '\0';
+    overwriteMaskString[MASK_SIZE] = '\0';
 
     BitMasks masks = {
         .overwriteMask=strtol(overwriteMaskString, NULL,2),
@@ -108,16 +111,13 @@ AddressValuePair parseSetMemInstruction(char* input) {
     return instr;
 }
 
-void recursive(char* maskString, long address, int* xPositions, int xPosLength, int currentArrayPos, long* addresses, int addressesSize) {
+
+// recursively create permutations of addresses and set the memory at these addresses to value
+void setMemByMaskPermutations(char* maskString, long baseAddress, int* xPositions, int xPosLength, int currentArrayPos, MemListItem** memory, long value) {
 
     if(currentArrayPos == xPosLength) {
-        long addr = (address | strtol(maskString, NULL, 2));
-        for(int i = 0;i < addressesSize; i++) {
-            if(addresses[i] == -1) {
-                addresses[i] = addr;
-                return;
-            }
-        }
+        long addr = (baseAddress | strtol(maskString, NULL, 2));
+        addToHashTable(memory, HASH_SIZE, addr, value);
         return;
     }
     int currentXPos = xPositions[currentArrayPos];
@@ -132,17 +132,19 @@ void recursive(char* maskString, long address, int* xPositions, int xPosLength, 
 
     currentArrayPos++;
 
-    recursive(perm1, address, xPositions, xPosLength, currentArrayPos, addresses, addressesSize);
-    recursive(perm2, address, xPositions, xPosLength, currentArrayPos, addresses, addressesSize);
+    setMemByMaskPermutations(perm1, baseAddress, xPositions, xPosLength, currentArrayPos, memory, value);
+    setMemByMaskPermutations(perm2, baseAddress, xPositions, xPosLength, currentArrayPos, memory, value);
     
 }
 
-long* getMaskedAddresses(char* maskLine, long address, int* returnedAddressCount) {
+void setMaskedAddresses(char* maskLine, long address, MemListItem** memory, long value) {
     char* maskStart = (maskLine + 7);
 
     char origMask[37];
-    char prepareMaskString[37];
 
+    // create prepareMask that sets all bits of address to 0 where mask has floating bit (X)
+    // remember positions of floating bits in mask
+    char prepareMaskString[37];
     int xPositions[36];
     int xPosCounter = 0;
 
@@ -159,23 +161,11 @@ long* getMaskedAddresses(char* maskLine, long address, int* returnedAddressCount
     prepareMaskString[36] = '\0';
     origMask[36] = '\0';
 
+    // mask with prepareMask
     long preMaskedAddress = (address & strtol(prepareMaskString, NULL,2));
     
-    int numPermutations = pow(2, xPosCounter); 
-
-    long* addresses = malloc(numPermutations * sizeof(long));
-    memset(addresses, -1, numPermutations * sizeof(long));
-
-    if(numPermutations == 1) {
-        addresses[0] = (address | strtol(origMask, NULL, 2));
-        (*returnedAddressCount) = 1;
-        return addresses;
-
-    }
-    recursive(origMask, preMaskedAddress, xPositions, xPosCounter, 0, addresses, numPermutations);
-
-    (*returnedAddressCount) = numPermutations;
-    return addresses;
+    // set value at all permutations of addresses
+    setMemByMaskPermutations(origMask, preMaskedAddress, xPositions, xPosCounter, 0, memory, value);
 }
 
 
@@ -194,36 +184,36 @@ int main(int argc, char *argv[]) {
 
     BitMasks currentValueMasks = {.prepareMask=0, .overwriteMask=0};
     char* currentMaskString = "";
-    MemListItem* memoryTable[500];
-    MemListItem* memoryTable2[500];
-    for(int i = 0; i < 500; i++) {
-        memoryTable[i] = NULL;
+
+    // memory represented by hashtables
+    MemListItem* memoryTable1[HASH_SIZE];
+    MemListItem* memoryTable2[HASH_SIZE];
+    for(int i = 0; i < HASH_SIZE; i++) {
+        memoryTable1[i] = NULL;
         memoryTable2[i] = NULL;
     }
 
     for(int i = 0; i < file.lineCount; i++) {
         if(strncmp(file.lines[i], "mask", 4) == 0) {
+            // save current mask
             currentMaskString = file.lines[i];
             currentValueMasks = parseBitmasks(currentMaskString);
         } else if(strncmp(file.lines[i], "mem", 3) == 0) {
+            // parse instructions
             AddressValuePair instr = parseSetMemInstruction(file.lines[i]);
+            // mask values and add to memory for puzzle 1
             long maskedVal = ((instr.value & currentValueMasks.prepareMask) | currentValueMasks.overwriteMask);
+            addToHashTable(memoryTable1, HASH_SIZE, instr.address, maskedVal);
 
-            addToHashTable(memoryTable, 500, instr.address, maskedVal);
-
-            int returnedAddressesCount;
-            long* addresses = getMaskedAddresses(currentMaskString, instr.address, &returnedAddressesCount);
-            for(int j = 0; j < returnedAddressesCount; j++) {
-                addToHashTable(memoryTable2, 500, addresses[j], instr.value);
-            }
-            free(addresses);
+            // set value at all address permutations produced by masking for puzzle 2 
+            setMaskedAddresses(currentMaskString, instr.address, memoryTable2, instr.value);
         }
     }
 
-    printf("Puzzle 1 Answer: %li\n", getSumOfValuesInHashTable(memoryTable, 500));
-    printf("Puzzle 2 Answer: %li\n", getSumOfValuesInHashTable(memoryTable2, 500));
+    printf("Puzzle 1 Answer: %li\n", getSumOfValuesInHashTable(memoryTable1, HASH_SIZE));
+    printf("Puzzle 2 Answer: %li\n", getSumOfValuesInHashTable(memoryTable2, HASH_SIZE));
 
-    clearHashTable(memoryTable, 500);
-    clearHashTable(memoryTable2, 500);
+    clearHashTable(memoryTable1, HASH_SIZE);
+    clearHashTable(memoryTable2, HASH_SIZE);
     closeFile(&file);
 }
