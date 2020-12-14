@@ -10,6 +10,6 @@ day14_exe = executable(
 
 test('Day 14 executes successfully', day14_exe, args: day14_input, suite: 'basic')
 
-#if valgrind.found()
-#    test('Day 14 memory leak check', valgrind, args: [ valgrind_args, day14_exe, day14_input], suite: 'memcheck')
-#endif
+if valgrind.found()
+    test('Day 14 memory leak check', valgrind, args: [ valgrind_args, day14_exe, day14_input], suite: 'memcheck')
+endif

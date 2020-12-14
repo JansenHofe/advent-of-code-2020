@@ -21,29 +21,60 @@ typedef struct MemListItem{
     struct MemListItem* next;
 } MemListItem;
 
-MemListItem* findAddress(MemListItem* listHead, long address) {
-    MemListItem* curr = listHead;
-    while (curr != NULL) {
+
+void addToHashTable(MemListItem** table, int hashSize, long address, long value) {
+    int index = address % hashSize;
+    MemListItem* curr = table[index];
+
+    if(curr == NULL) {
+        MemListItem* toAdd = malloc(sizeof(MemListItem));
+        toAdd->mem.address = address;
+        toAdd->mem.value = value;
+        toAdd->next = NULL;
+
+        table[index] = toAdd;
+        return;
+    }
+
+    while(curr != NULL) {
         if(curr->mem.address == address) {
-            return curr;
+            curr->mem.value = value;
+            return;
+        }
+        if(curr->next == NULL) {
+            MemListItem* toAdd = malloc(sizeof(MemListItem));
+            toAdd->mem.address = address;
+            toAdd->mem.value = value;
+            toAdd->next = NULL;
+            curr->next = toAdd;
         }
         curr = curr->next;
     }
-    return NULL;
 }
 
-MemListItem* setMem(MemListItem* listHead, long address, long value) {
-    MemListItem* memItem = findAddress(listHead, address);
-    if(memItem != NULL) {
-        memItem->mem.value = value;
-        return listHead;
-    }
+long getSumOfValuesInHashTable(MemListItem** table, int hashSize) {
+    long sum = 0;
+    for(int i = 0; i < hashSize; i++) {
+        MemListItem* curr = table[i];
 
-    MemListItem* newItem = malloc(sizeof(MemListItem));
-    newItem->mem.address = address;
-    newItem->mem.value = value;
-    newItem->next = listHead;
-    return newItem;
+        while(curr != NULL) {
+            sum += curr->mem.value;
+            curr = curr->next;
+        }
+    }
+    return sum;
+}
+
+void clearHashTable(MemListItem** table, int hashSize) {
+    for(int i = 0; i < hashSize; i++) {
+        MemListItem* curr = table[i];
+
+        while(curr != NULL) {
+            MemListItem* temp = curr->next;
+            free(curr);
+            curr = temp;
+        }
+    }
 }
 
 BitMasks parseBitmasks(char* input) {
@@ -147,23 +178,6 @@ long* getMaskedAddresses(char* maskLine, long address, int* returnedAddressCount
     return addresses;
 }
 
-long getSumOfValuesInMemory(MemListItem* memory) {
-    MemListItem* curr = memory;
-    long sum = 0;
-    while (curr != NULL) {
-        sum += curr->mem.value;
-        curr = curr->next;
-    }
-    return sum;
-}
-
-void clearMem(MemListItem *memory) {
-    while(memory != NULL) {
-        MemListItem* temp = memory->next;
-        free(memory);
-        memory = temp;
-    }
-}
 
 int main(int argc, char *argv[]) {
 
@@ -180,8 +194,12 @@ int main(int argc, char *argv[]) {
 
     BitMasks currentValueMasks = {.prepareMask=0, .overwriteMask=0};
     char* currentMaskString = "";
-    MemListItem* memory = NULL;
-    MemListItem* memory2 = NULL;
+    MemListItem* memoryTable[500];
+    MemListItem* memoryTable2[500];
+    for(int i = 0; i < 500; i++) {
+        memoryTable[i] = NULL;
+        memoryTable2[i] = NULL;
+    }
 
     for(int i = 0; i < file.lineCount; i++) {
         if(strncmp(file.lines[i], "mask", 4) == 0) {
@@ -190,21 +208,22 @@ int main(int argc, char *argv[]) {
         } else if(strncmp(file.lines[i], "mem", 3) == 0) {
             AddressValuePair instr = parseSetMemInstruction(file.lines[i]);
             long maskedVal = ((instr.value & currentValueMasks.prepareMask) | currentValueMasks.overwriteMask);
-            memory = setMem(memory, instr.address, maskedVal);
+
+            addToHashTable(memoryTable, 500, instr.address, maskedVal);
 
             int returnedAddressesCount;
             long* addresses = getMaskedAddresses(currentMaskString, instr.address, &returnedAddressesCount);
             for(int j = 0; j < returnedAddressesCount; j++) {
-                memory2 = setMem(memory2, addresses[j], instr.value);
+                addToHashTable(memoryTable2, 500, addresses[j], instr.value);
             }
             free(addresses);
         }
     }
 
-    printf("Puzzle 1 Answer: %li\n", getSumOfValuesInMemory(memory));
-    printf("Puzzle 2 Answer: %li\n", getSumOfValuesInMemory(memory2));
+    printf("Puzzle 1 Answer: %li\n", getSumOfValuesInHashTable(memoryTable, 500));
+    printf("Puzzle 2 Answer: %li\n", getSumOfValuesInHashTable(memoryTable2, 500));
 
-    clearMem(memory);
-    clearMem(memory2);
+    clearHashTable(memoryTable, 500);
+    clearHashTable(memoryTable2, 500);
     closeFile(&file);
 }
