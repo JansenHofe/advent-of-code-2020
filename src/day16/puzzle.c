@@ -25,47 +25,43 @@ TicketField* parseTicketFields(char* input) {
     return ticketField;
 }
 
+int* parseTicket(char* input) {
+    int* ticket = malloc(sizeof(int) * NUM_TICKET_FIELDS);
+    char* valueString = strtok(input, ",\n");
+    int idx = 0;
+    while(valueString != NULL) {
+        int value = atoi(valueString);
+        ticket[idx] = value;
+        idx++; 
+        valueString = strtok(NULL, ",\n");
+    }
+    return ticket;
+}
+
 int isWithinFieldRanges(int value, TicketField* field) {
-    //printf("check if %i is in (%i-%i) or (%i-%i)", value, field->ranges[0][0], field->ranges[0][1], field->ranges[1][0], field->ranges[1][1]);
     if((value >= field->ranges[0][0] && value <= field->ranges[0][1]) || (value >= field->ranges[1][0] && value <= field->ranges[1][1])) {
-        //printf("--> true\n");
         return 1;
     }
-    //printf("--> false\n");
     return 0;
 }
 
-static int comp(const void* p1, const void* p2) {
-  int* arr1 = (int*)p1;
-  int* arr2 = (int*)p2;
-  int diff1 = arr1[0] - arr2[0];
-  if (diff1) return diff1;
-  return arr1[1] - arr2[1];
-}
-
-int** unionizeRanges(int numRanges, int ranges[numRanges][2], int* numUnionizedRange ) {
-    qsort(ranges, numRanges, 2 * sizeof(int), comp);
-
-    int** unionRanges = malloc(sizeof(int) * 2 * numRanges);
-    unionRanges[0][0] = ranges[0][0];
-    unionRanges[0][1] = ranges[0][1];
-    int unionRangesCount = 1;
-    for(int i = 1; i < numRanges; i++) {
-        for(int j = 0; j < unionRangesCount; j++) {
-            if(ranges[i][0] <= unionRanges[j][1]) {
-                if(ranges[i][1] > unionRanges[j][1]) {
-                    unionRanges[j][1] = ranges[i][1];
-                }
-            } else {
-                unionRanges[unionRangesCount][0] = ranges[i][0];
-                unionRanges[unionRangesCount][1] = ranges[i][1];
-                unionRangesCount++;
+int getTicketErrorRate(TicketField** ticketfields, int* ticket) {
+    int errorRate = 0;
+    for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
+        int currTicketFieldValid = 0;
+        for(int j = 0; j < NUM_TICKET_FIELDS; j++) {
+            if(isWithinFieldRanges(ticket[i], ticketfields[j])) {
+                currTicketFieldValid = 1;
+                break;
             }
         }
+        if(!currTicketFieldValid) {
+            errorRate += ticket[i];
+        }
     }
-    *numUnionizedRange = unionRangesCount;
-    return unionRanges;
+    return errorRate;
 }
+
 
 int main(int argc, char *argv[]) {
 
@@ -79,24 +75,18 @@ int main(int argc, char *argv[]) {
         perror("Error reading file: ");
         return -1;
     }
-    TicketField* fields[NUM_TICKET_FIELDS];
-    int numRanges = NUM_TICKET_FIELDS * 2;
-    int allRanges[numRanges][2];
 
+    // parse field definitions with its ranges
+    TicketField* fields[NUM_TICKET_FIELDS];
     for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
         fields[i] = parseTicketFields(file.lines[i]);
-        allRanges[i][0] = fields[i]->ranges[0][0];
-        allRanges[i][1] = fields[i]->ranges[0][1];
-        allRanges[NUM_TICKET_FIELDS + i][0] = fields[i]->ranges[1][0];
-        allRanges[NUM_TICKET_FIELDS + i][1] = fields[i]->ranges[1][1];
 
     }
+    // parse my tickets
+    int* myTicket = parseTicket(file.lines[MY_TICKET_LINE]);
 
-    int numUnionizedRanges = 0;
-    int** unionizedRanges = unionizeRanges(numRanges, allRanges, &numUnionizedRanges);
-
-    int scanningErrorRate = 0;
-
+    // create field-to-position matrix, that defines which field definition matches which position in a ticket
+    // initialize it with all 1
     int fieldToPosMatrix[NUM_TICKET_FIELDS][NUM_TICKET_FIELDS];
     for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
         for(int j = 0; j < NUM_TICKET_FIELDS; j++) {
@@ -104,27 +94,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    int scanningErrorRate = 0;
     for(int i = NEARBY_TICKETS_START_LINE; i < file.lineCount; i++) {
-        char* valueString = strtok(file.lines[i], ",\n");
-        int idx = 0;
-        int valid = 1;
-        int ticket[NUM_TICKET_FIELDS];
-        while(valueString != NULL) {
-            int value = atoi(valueString);
-            ticket[idx] = value;
-            idx++; 
+        // parse each ticket and get its error rate
+        int* ticket = parseTicket(file.lines[i]);
+        int errorRate = getTicketErrorRate(fields, ticket);
+        scanningErrorRate += errorRate;
 
-            for(int j = 0; j < numUnionizedRanges; j++) {
-                if(value >= unionizedRanges[j][0] && value <= unionizedRanges[j][1]) {
-                    break;
-                }
-                scanningErrorRate += value;
-                valid = 0;
-            }
-            valueString = strtok(NULL, ",\n");
-        }
-
-        if(valid) {
+        // if this ticket is valid, update the field-to-position matrix to remove impossible combinations
+        if(!errorRate) {
             for(int availableFieldsIdx = 0; availableFieldsIdx < NUM_TICKET_FIELDS; availableFieldsIdx++) {
                 for(int currTicketFieldIdx = 0; currTicketFieldIdx < NUM_TICKET_FIELDS; currTicketFieldIdx++) {
                     if(!isWithinFieldRanges(ticket[currTicketFieldIdx], fields[availableFieldsIdx])) {
@@ -133,45 +111,44 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+        free(ticket);
     }
 
+    // create array that defines which field definition (array index) belongs to which position in ticket (value)
     int positionsInTicket [NUM_TICKET_FIELDS];
     for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
         positionsInTicket[i] = -1;
     }
 
+    // iterate the field-to-position matrix
     for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
         int possibilitiesForField = 0;
         int posLastPossibility = -1;
+        // count how many positions are possible for the current field
+        // and remember the last possible position
         for(int j = 0; j < NUM_TICKET_FIELDS; j++) {
             if(fieldToPosMatrix[i][j] == 1) {
                  possibilitiesForField += 1;
                  posLastPossibility = j;
             }
         }
+        // if the field has only 1 possible position and is not already known, save it
+        // -> the position for this field is now known
         if(possibilitiesForField == 1 && positionsInTicket[i] == -1) {
-
             positionsInTicket[i] = posLastPossibility;
+
+            // as this position is reserved, it is erased as a possibility for all other fields 
             for(int k = 0; k < NUM_TICKET_FIELDS; k++) {
                 if(k != i) {
                     fieldToPosMatrix[k][posLastPossibility] = 0;
                 }
             }
+            // then we start the outer iteration from the beginning
             i = -1;
         }
     }
 
-    int myTicket[NUM_TICKET_FIELDS];
-    int idx = 0;
-
-    char* myTicketValueString = strtok(file.lines[MY_TICKET_LINE], ",\n");
-    while (myTicketValueString != NULL) {
-        int value = atoi(myTicketValueString);
-        myTicket[idx] = value;
-        idx++;
-        myTicketValueString = strtok(NULL, ",\n");
-    }
-
+    // multiply all values of fields in my ticket, that contain "departure"
     long myTicketDeptartureValueProduct = 1;
     for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
         if(strstr(fields[i]->name, "departure") != NULL) {
@@ -183,4 +160,9 @@ int main(int argc, char *argv[]) {
 
     printf("Puzzle 1 Answer: %i\n", scanningErrorRate);
     printf("Puzzle 2 Answer: %li\n", myTicketDeptartureValueProduct);
+    for(int i = 0; i < NUM_TICKET_FIELDS; i++) {
+        free(fields[i]);
+    }
+    free(myTicket);
+    closeFile(&file);
 }
